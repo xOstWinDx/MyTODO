@@ -18,21 +18,22 @@ def get_access_token(request: Request):
     token = request.cookies.get("token", None)
     if not token:
         raise MissTokenException
-    try:
-        token = jwt.decode(token, settings.SECRET_KEY, settings.ALGORITHM)
-    except JWTError:
-        raise InvalidTokenException
     return token
 
 
 def get_user(is_admin: bool = False) -> Callable:
 
-    async def inner(token=Depends(get_access_token)):
+    async def inner(token: str = Depends(get_access_token)):
+
+        try:
+            token = jwt.decode(token, settings.SECRET_KEY, settings.ALGORITHM)
+        except JWTError:
+            raise InvalidTokenException
 
         if "uid" not in token:
             raise IncorrectTokenException
 
-        user: User = await UserDAO.fetch_one_or_none(ID=token["uid"])
+        user: User = await UserDAO.fetch_one_or_none_with_tasks(ID=token["uid"])
         if not user:
             raise IncorrectTokenException
 

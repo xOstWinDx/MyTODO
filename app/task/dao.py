@@ -1,6 +1,7 @@
 import datetime
 
-from sqlalchemy import select, update
+from fastapi import HTTPException
+from sqlalchemy import select, update, delete
 
 from app.dao.base import BaseDAO
 from app.database import get_async_session
@@ -27,15 +28,44 @@ class TaskDAO(BaseDAO):
 
     @classmethod
     async def update(cls, ID, **data):
+
         async with get_async_session() as session:
             if "status" in data:
-                await session.execute(
+                r = await session.execute(
                     update(cls.model)
                     .values(status=data["status"])
                     .filter_by(ID=ID, assigned_user=data["user_id"])
+                    .returning(cls.model)
                 )
+                r = r.scalar()
             else:
-                await session.execute(update(cls.model).values(**data).filter_by(ID=ID))
+                r = await session.execute(
+                    update(cls.model)
+                    .values(**data)
+                    .filter_by(ID=ID)
+                    .returning(cls.model)
+                )
+                r = r.scalar()
             await session.commit()
+        if not r:
 
+            raise HTTPException(status_code=400, detail="Не верные данные")
+
+        return r
+
+    @classmethod
+    async def delete(
+        cls,
+        task_id: int,
+        user_id: int,
+        isadmin: bool = False,
+    ):
+        async with get_async_session() as session:
+            if isadmin:
+                await session.execute(delete(cls.model).filter_by(ID=task_id))
+            else:
+                await session.execute(
+                    delete(cls.model).filter_by(ID=task_id, created_by=user_id)
+                )
+            await session.commit()
         return "ok"

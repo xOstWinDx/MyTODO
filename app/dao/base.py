@@ -1,5 +1,8 @@
+from fastapi import HTTPException
+
 from app.database import get_async_session
 from sqlalchemy import insert, select, update
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class BaseDAO:
@@ -7,9 +10,18 @@ class BaseDAO:
 
     @classmethod
     async def add(cls, **data):
-        async with get_async_session() as session:
-            await session.execute(insert(cls.model).values(**data))
-            await session.commit()
+        try:
+            async with get_async_session() as session:
+                r = await session.execute(
+                    insert(cls.model).values(**data).returning(cls.model)
+                )
+                r = r.scalar_one_or_none()
+                await session.commit()
+            if not r:
+                raise HTTPException(status_code=400, detail="Не верные данные")
+            return r
+        except SQLAlchemyError:
+            raise HTTPException(status_code=400, detail="Не верные данные")
 
     @classmethod
     async def fetch_one_or_none(cls, **filter_by):

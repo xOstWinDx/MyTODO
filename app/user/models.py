@@ -1,7 +1,9 @@
 from app.database import Base
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
-from app.task.models import Task
+if TYPE_CHECKING:
+    from app.task.models import Task
 
 
 class User(Base):
@@ -10,5 +12,8 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(nullable=False, server_default="False")
 
     tasks: Mapped[list["Task"]] = relationship(
-        back_populates="user", lazy="immediate", foreign_keys=Task.assigned_user
+        back_populates="user", foreign_keys="Task.assigned_user"
     )
+
+    def __str__(self):
+        return f"#{self.ID}: {self.email}"
